@@ -27,7 +27,13 @@
   font-size: 1.5rem;
 }
 
-.stats-button {
+.header-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.stats-button,
+.inventory-button {
   padding: 0.5rem 1rem;
   background: rgba(100, 149, 237, 0.2);
   color: #6495ed;
@@ -38,7 +44,18 @@
   transition: all 0.3s ease;
 }
 
-.stats-button:hover {
+.stats-button:hover,
+.inventory-button:hover {
   background: rgba(100, 149, 237, 0.3);
   transform: translateY(-1px);
+}
+
+.inventory-button {
+  background: rgba(212, 175, 55, 0.2);
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
+
+.inventory-button:hover {
+  background: rgba(212, 175, 55, 0.3);
 }
