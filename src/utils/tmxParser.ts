@@ -45,7 +45,11 @@ export const tileImages: { [key: string]: ImageSource } = {
   //stone: new ImageSource('/tiles/tile_063.png'),
   //dirt: new ImageSource('/tiles/tile_000.png'),
   sand: new ImageSource('/tiles/tile_015.png'),
-  character: new ImageSource('/characters/B.png'),
+  knight: new ImageSource('/characters/knight.png'),
+  dwarf: new ImageSource('/characters/dwarf.png'),
+  druid: new ImageSource('/characters/druid.png'),
+  goblin: new ImageSource('/characters/goblin.png'),
+  goblinB: new ImageSource('/characters/goblinB.png'),
   //forest: new ImageSource('/tiles/tile_031.png')
 }
 

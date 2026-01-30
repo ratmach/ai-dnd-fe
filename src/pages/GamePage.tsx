@@ -3,6 +3,8 @@ import PlayerList from '../components/PlayerList'
 import CharacterStatsModal from '../components/CharacterStatsModal'
 import InventoryModal from '../components/InventoryModal'
 import IsometricMap from '../components/IsometricMap'
+import ActionBox from '../components/ActionBox'
+import ActionLogs, { ActionLogEntry } from '../components/ActionLogs'
 import { Item } from '../types/items'
 import { mockItems } from '../data/mockItems'
 import './GamePage.css'
@@ -17,6 +19,21 @@ export interface Player {
   maxMana: number
   level: number
   online: boolean
+  character?: string // Maps to tileImages key (e.g., 'knight', 'dwarf', 'druid')
+  x?: number // Isometric map x coordinate
+  y?: number // Isometric map y coordinate
+}
+
+export interface Enemy {
+  id: number
+  name: string
+  hp: number
+  maxHp: number
+  mana: number
+  maxMana: number
+  character: string // Maps to tileImages key (e.g., 'goblin', 'goblinB')
+  x: number // Isometric map x coordinate
+  y: number // Isometric map y coordinate
 }
 
 function GamePage() {
@@ -24,6 +41,17 @@ function GamePage() {
   const [showInventoryModal, setShowInventoryModal] = useState(false)
   const [gold, setGold] = useState(1250)
   const [maxWeight] = useState(50) // Max carry weight in kg
+  const [currentAP, setCurrentAP] = useState(10)
+  const [maxAP] = useState(10)
+  const [actionLogs, setActionLogs] = useState<ActionLogEntry[]>([
+    {
+      id: 1,
+      timestamp: new Date(),
+      type: 'system',
+      author: 'System',
+      message: 'Game started'
+    }
+  ])
   const [inventoryItems, setInventoryItems] = useState<(Item | null)[]>(() => {
     // Initialize with some mock items
     const initialItems: (Item | null)[] = new Array(64).fill(null)
@@ -59,7 +87,10 @@ function GamePage() {
       mana: 60,
       maxMana: 100,
       level: 5,
-      online: true
+      online: true,
+      character: 'knight',
+      x: 10,
+      y: 10
     },
     {
       id: 2,
@@ -70,7 +101,10 @@ function GamePage() {
       mana: 90,
       maxMana: 100,
       level: 3,
-      online: true
+      online: true,
+      character: 'dwarf',
+      x: 12,
+      y: 10
     },
     {
       id: 3,
@@ -81,7 +115,34 @@ function GamePage() {
       mana: 30,
       maxMana: 100,
       level: 7,
-      online: false
+      online: false,
+      character: 'druid',
+      x: 10,
+      y: 12
+    }
+  ])
+  const [enemies, setEnemies] = useState<Enemy[]>([
+    {
+      id: 1,
+      name: 'Goblin',
+      hp: 30,
+      maxHp: 30,
+      mana: 10,
+      maxMana: 10,
+      character: 'goblin',
+      x: 15,
+      y: 12
+    },
+    {
+      id: 2,
+      name: 'Goblin B',
+      hp: 35,
+      maxHp: 35,
+      mana: 15,
+      maxMana: 15,
+      character: 'goblinB',
+      x: 18,
+      y: 15
     }
   ])
 
@@ -95,28 +156,51 @@ function GamePage() {
     setInventoryItems(items)
   }
 
+  const handleAction = (action: string, type: 'button' | 'text') => {
+    const currentPlayer = players.find(p => p.online) || players[0]
+    const newLog: ActionLogEntry = {
+      id: actionLogs.length + 1,
+      timestamp: new Date(),
+      type: 'player',
+      author: currentPlayer.name,
+      message: action
+    }
+    setActionLogs([newLog, ...actionLogs]) // Newest first
+  }
+
   return (
     <div className="game-page">
       <PlayerList players={players} />
       <div className="game-content">
         <div className="game-header">
           <h2>DnD Game</h2>
-          <div className="header-buttons">
-            <button
-              className="stats-button"
-              onClick={() => setShowStatsModal(true)}
-            >
-              Character Stats
-            </button>
-            <button
-              className="inventory-button"
-              onClick={() => setShowInventoryModal(true)}
-            >
-              Inventory
-            </button>
+          <div className="header-right">
+            <div className="ap-counter">
+              AP: {currentAP}/{maxAP}
+            </div>
+            <div className="header-buttons">
+              <button
+                className="stats-button"
+                onClick={() => setShowStatsModal(true)}
+              >
+                Character Stats
+              </button>
+              <button
+                className="inventory-button"
+                onClick={() => setShowInventoryModal(true)}
+              >
+                Inventory
+              </button>
+            </div>
           </div>
         </div>
-        <IsometricMap />
+        <div className="game-main-content">
+          <IsometricMap players={players} enemies={enemies} />
+        </div>
+        <div className="game-sidebar-overlay">
+          <ActionBox onAction={handleAction} />
+          <ActionLogs logs={actionLogs} />
+        </div>
       </div>
       {showStatsModal && (
         <CharacterStatsModal onClose={() => setShowStatsModal(false)} />

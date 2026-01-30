@@ -1,13 +1,15 @@
 .player-list {
   position: fixed;
   left: 0;
-  top: 0;
+  top: 73px; /* Start below header */
   width: 280px;
-  height: 100vh;
-  background: rgba(20, 20, 30, 0.95);
+  height: calc(100vh - 73px); /* Full height minus header */
+  background: rgba(15, 15, 26, 0.95);
+  backdrop-filter: blur(10px);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
   overflow-y: auto;
-  z-index: 10;
+  z-index: 1000;
 }
 
 .player-list-title {

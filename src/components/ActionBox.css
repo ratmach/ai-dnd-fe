@@ -1,0 +1,73 @@
+.action-box {
+  background: rgba(20, 20, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.action-button {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: rgba(100, 149, 237, 0.2);
+  color: #6495ed;
+  border: 1px solid #6495ed;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.action-button:hover {
+  background: rgba(100, 149, 237, 0.3);
+  transform: translateY(-1px);
+}
+
+.action-text-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-text-input {
+  flex: 1;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.action-text-input:focus {
+  border-color: #6495ed;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.action-text-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.action-submit-button {
+  padding: 0.75rem 1.5rem;
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid #22c55e;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.action-submit-button:hover {
+  background: rgba(34, 197, 94, 0.3);
+  transform: translateY(-1px);
+}
