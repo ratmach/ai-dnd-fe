@@ -17,11 +17,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
-  background: rgba(20, 20, 30, 0.8);
+  padding: 0.5rem 2rem;
+  background: rgba(20, 20, 30, 0.7);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 1001;
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 .header-right {
@@ -42,7 +46,7 @@
 
 .game-header h2 {
   color: #fff;
-  font-size: 1.5rem;
+  font-size: 1.1rem;
 }
 
 .header-buttons {
@@ -78,6 +82,16 @@
   background: rgba(212, 175, 55, 0.3);
 }
 
+.levelup-button {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  border-color: #a78bfa;
+}
+
+.levelup-button:hover {
+  background: rgba(139, 92, 246, 0.3);
+}
+
 .game-main-content {
   flex: 1;
   position: relative;
@@ -86,15 +100,15 @@
 
 .game-sidebar-overlay {
   position: fixed;
-  top: 73px; /* Start below header */
+  top: 49px; /* Start below header (reduced header height) */
   right: 0;
   width: 350px;
-  height: calc(100vh - 73px); /* Full height minus header */
+  height: calc(100vh - 49px); /* Full height minus header */
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-  background: rgba(15, 15, 26, 0.95);
+  gap: 0;
+  padding: 0;
+  background: rgba(15, 15, 26, 0.7);
   backdrop-filter: blur(10px);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);

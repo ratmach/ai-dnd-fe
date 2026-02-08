@@ -3,19 +3,25 @@ import './ActionBox.css'
 
 interface ActionBoxProps {
   onAction: (action: string, type: 'button' | 'text') => void
+  onCustomAction?: (customAction: string) => Promise<void>
+  activePlayerName?: string
 }
 
-function ActionBox({ onAction }: ActionBoxProps) {
+function ActionBox({ onAction, onCustomAction, activePlayerName = 'Player' }: ActionBoxProps) {
   const [textInput, setTextInput] = useState('')
 
   const handleButtonAction = (action: string) => {
     onAction(action, 'button')
   }
 
-  const handleTextSubmit = (e: React.FormEvent) => {
+  const handleTextSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (textInput.trim()) {
-      onAction(textInput.trim(), 'text')
+      if (onCustomAction) {
+        await onCustomAction(textInput.trim())
+      } else {
+        onAction(textInput.trim(), 'text')
+      }
       setTextInput('')
     }
   }

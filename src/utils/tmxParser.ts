@@ -8,6 +8,10 @@ export interface TileProperties {
   [key: string]: {value: string, image: string | null}
 }
 
+export interface TilePassability {
+  passable: boolean
+}
+
 export interface Tile {
   id: number
   properties: TileProperties
@@ -50,6 +54,7 @@ export const tileImages: { [key: string]: ImageSource } = {
   druid: new ImageSource('/characters/druid.png'),
   goblin: new ImageSource('/characters/goblin.png'),
   goblinB: new ImageSource('/characters/goblinB.png'),
+  default: new ImageSource('/characters/goblin.png'),
   //forest: new ImageSource('/tiles/tile_031.png')
 }
 
@@ -149,6 +154,40 @@ export function parseTMX(xmlText: string): MapData {
 /**
  * Get tile color based on tile ID and terrain type
  */
+/**
+ * Gets the passability property for a tile
+ * Defaults to true if not specified
+ */
+export function getTilePassable(tileId: number, tilesets: Tileset[]): boolean {
+  if (tileId === 0) return true // Empty tiles are passable
+
+  // Find which tileset this tile belongs to
+  let tileset: Tileset | null = null
+  let localTileId = tileId
+
+  for (let i = tilesets.length - 1; i >= 0; i--) {
+    if (tileId >= tilesets[i].firstGid) {
+      tileset = tilesets[i]
+      localTileId = tileId - tilesets[i].firstGid
+      break
+    }
+  }
+
+  if (!tileset) return true // Default to passable
+
+  const tile = tileset.tiles[localTileId]
+  if (!tile) return true // Default to passable
+
+  const passableProp = tile.properties.passable
+  if (passableProp) {
+    // Check if value is "false" or "0"
+    const value = passableProp.value.toLowerCase()
+    return value !== 'false' && value !== '0'
+  }
+
+  return true // Default to passable
+}
+
 export function getTileColor(tileId: number, tilesets: Tileset[]): string | null {
   if (tileId === 0) return null // Empty tile
 

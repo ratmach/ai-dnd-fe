@@ -1,24 +1,39 @@
 import { useEffect, useRef, useState } from 'react'
 import * as ex from 'excalibur'
-import { parseTMX, getTileColor, getTileImage, tileImages } from '../utils/tmxParser'
+import { parseTMX, getTileColor, getTileImage, getTilePassable, tileImages } from '../utils/tmxParser'
 import { Enemy, Player } from '../pages/GamePage'
+import { executeAction, findAdjacentTile, ActionParameters } from '../utils/actionSystem'
 import './IsometricMap.css'
 
 interface IsometricMapProps {
   players?: Player[]
   enemies?: Enemy[]
+  activePlayerId?: number
+  onActionComplete?: () => void
 }
 
-function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
+// Mock spell data
+const mockSpells = [
+  { id: 1, name: 'Fireball', level: 3, icon: '🔥', cooldown: 0, maxCooldown: 0 },
+  { id: 2, name: 'Ice Bolt', level: 2, icon: '❄️', cooldown: 2, maxCooldown: 3 },
+  { id: 3, name: 'Lightning', level: 4, icon: '⚡', cooldown: 0, maxCooldown: 0 },
+  { id: 4, name: 'Heal', level: 1, icon: '💚', cooldown: 1, maxCooldown: 2 },
+  { id: 5, name: 'Shield', level: 2, icon: '🛡️', cooldown: 0, maxCooldown: 0 },
+]
+
+function IsometricMap({ players = [], enemies = [], activePlayerId, onActionComplete }: IsometricMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<ex.Engine | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [spellSlotsMinimized, setSpellSlotsMinimized] = useState(false)
 
   useEffect(() => {
     if (!canvasRef.current) return
 
     let engine: ex.Engine | null = null
+    let wheelHandler: ((evt: WheelEvent) => void) | null = null
+    const canvas = canvasRef.current
 
     const loadMap = async () => {
       try {
@@ -32,8 +47,8 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
 
         // Create Excalibur engine
         engine = new ex.Engine({
-          width: 1200,
-          height: 800,
+          width: window.innerWidth, // Full screen width
+          height: window.innerHeight, // Full screen height
           canvasElement: canvasRef.current!,
           backgroundColor: ex.Color.fromHex('#1a1a2e'),
           pointerScope: ex.PointerScope.Canvas
@@ -62,8 +77,17 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
           const screenY = (isoX + isoY) * (tileHeight / 2)
           return new ex.Vector(screenX, screenY)
         }
-        const enemyOnTile = (x: number, y: number): boolean => {
-          return enemies.some((enemy) => enemy.x === x && enemy.y === y)
+        const enemyOnTile = (x: number, y: number): Enemy | null => {
+          return enemies.find((enemy) => enemy.x === x && enemy.y === y) || null
+        }
+        
+        // Get active player
+        const getActivePlayer = (): Player | null => {
+          if (activePlayerId !== undefined) {
+            return players.find(p => p.id === activePlayerId) || null
+          }
+          // Default to first online player or first player
+          return players.find(p => p.online) || players[0] || null
         }
 
         // Store tiles and track hovered tile
@@ -71,6 +95,7 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
         let highlightActor: ex.Actor | null = null
         let pathLine: ex.Actor | null = null
         let pathText: ex.Actor | null = null
+        let blockedIndicator: ex.Actor | null = null // Red X for non-passable tiles
 
         // Create highlight overlay actor (initially hidden)
         // Use same diamond shape as tiles
@@ -95,6 +120,35 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
         highlightActor.graphics.opacity = 0 // Hidden initially
         engine.add(highlightActor)
 
+        // Create blocked indicator (red X) for non-passable tiles
+        blockedIndicator = new ex.Actor({
+          pos: new ex.Vector(0, 0),
+          z: 101 // Above highlight
+        })
+        
+        // Create isometric X shape (two crossing lines) that fits within the diamond tile
+        // The diamond shape has corners at: top (0, -tileHeight/2), right (tileWidth/2, 0), 
+        // bottom (0, tileHeight/2), left (-tileWidth/2, 0)
+        // Draw X from corner to opposite corner, scaled down by 70% to fit nicely inside
+        const scale = 0.7
+        // Line 1: from top-left area to bottom-right area
+        const xLine1 = new ex.Line({
+          start: new ex.Vector(-tileWidth / 2 * scale, -tileHeight / 2 * scale),
+          end: new ex.Vector(tileWidth / 2 * scale, tileHeight / 2 * scale),
+          color: ex.Color.fromRGB(220, 38, 38, 0.9),
+          thickness: 4
+        })
+        // Line 2: from top-right area to bottom-left area
+        const xLine2 = new ex.Line({
+          start: new ex.Vector(tileWidth / 2 * scale, -tileHeight / 2 * scale),
+          end: new ex.Vector(-tileWidth / 2 * scale, tileHeight / 2 * scale),
+          color: ex.Color.fromRGB(220, 38, 38, 0.9),
+          thickness: 4
+        })
+        blockedIndicator.graphics.add(xLine1)
+        blockedIndicator.graphics.add(xLine2)
+        blockedIndicator.graphics.opacity = 0 // Hidden initially
+        engine.add(blockedIndicator)
 
         // Create path line actor (dotted line from player to hovered tile)
         pathLine = new ex.Actor({
@@ -240,20 +294,21 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
               // Enable pointer events
               tile.body.collisionType = ex.CollisionType.Passive
 
-              tile.on('pointerdown', () => {
-                // Prevent panning when clicking on tiles
-                isPanning = false
-                panStartScreenPos = null
-                panStartCameraPos = null
-              })
-
               tile.on('pointerenter', () => {
+                const isPassable = getTilePassable(tileId, mapData.tilesets)
+                const enemy = enemyOnTile(x, y)
+                
                 if (highlightActor) {
                   highlightActor.pos = tile.pos
-                  if (enemyOnTile(x, y)) {
+                  if (enemy) {
                     highlightActor.graphics.getGraphic("default")!.tint = ex.Color.fromRGB(220, 38, 38, 0.4)
                     if (canvasRef.current) {
                       canvasRef.current.style.cursor = "pointer"
+                    }
+                  } else if (!isPassable) {
+                    highlightActor.graphics.getGraphic("default")!.tint = ex.Color.fromRGB(150, 0, 0, 0.4)
+                    if (canvasRef.current) {
+                      canvasRef.current.style.cursor = "not-allowed"
                     }
                   } else {
                     highlightActor.graphics.getGraphic("default")!.tint = ex.Color.fromRGB(255, 255, 255, 0.3)
@@ -262,19 +317,102 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
                     }
                   }
                   highlightActor.graphics.opacity = 1
-                  if(canvasRef.current){
-                    console.log(canvasRef.current)
+                }
+                
+                // Show blocked indicator for non-passable tiles
+                if (blockedIndicator) {
+                  if (!isPassable && !enemy) {
+                    blockedIndicator.pos = tile.pos
+                    blockedIndicator.graphics.opacity = 1
+                  } else {
+                    blockedIndicator.graphics.opacity = 0
                   }
                 }
-                // Update path line from first player to tile center
-                if (players && players.length > 0 && players[0].x !== undefined && players[0].y !== undefined) {
-                  const firstPlayerPos = isoToScreen(players[0].x, players[0].y)
-                  const playerCenter = new ex.Vector(
-                    firstPlayerPos.x + (engine?.drawWidth || 0) / 2,
-                    firstPlayerPos.y + 150 - 15
-                  )
-                  const tileCenter = tile.pos
-                  updatePathLine(playerCenter, tileCenter)
+                
+                // Update path line from active player to tile center (only if passable)
+                if (isPassable) {
+                  const activePlayer = getActivePlayer()
+                  if (activePlayer && activePlayer.x !== undefined && activePlayer.y !== undefined) {
+                    const playerPos = isoToScreen(activePlayer.x, activePlayer.y)
+                    const playerCenter = new ex.Vector(
+                      playerPos.x + (engine?.drawWidth || 0) / 2,
+                      playerPos.y + 150 - 15
+                    )
+                    const tileCenter = tile.pos
+                    updatePathLine(playerCenter, tileCenter)
+                  }
+                } else {
+                  // Hide path line for non-passable tiles
+                  if (pathLine) {
+                    pathLine.graphics.opacity = 0
+                  }
+                  if (pathText) {
+                    pathText.graphics.opacity = 0
+                  }
+                }
+              })
+              
+              tile.on('pointerleave', () => {
+                // Hide blocked indicator when leaving tile
+                if (blockedIndicator) {
+                  blockedIndicator.graphics.opacity = 0
+                }
+              })
+              
+              tile.on('pointerdown', async (e: ex.PointerEvent) => {
+                // Prevent panning when clicking on tiles
+                e.cancel()
+                
+                const activePlayer = getActivePlayer()
+                if (!activePlayer) return
+                
+                // Check if tile is passable
+                const isPassable = getTilePassable(tileId, mapData.tilesets)
+                if (!isPassable) {
+                  // Don't allow movement to non-passable tiles
+                  return
+                }
+                
+                const enemy = enemyOnTile(x, y)
+                
+                if (enemy) {
+                  // Enemy on tile - move to adjacent tile and attack
+                  const adjacentTile = findAdjacentTile(x, y, mapData.width, mapData.height)
+                  if (adjacentTile) {
+                    // Check if adjacent tile is passable
+                    const adjacentTileId = mapData.layers[0]?.tiles[adjacentTile.y]?.[adjacentTile.x] || 0
+                    const isAdjacentPassable = getTilePassable(adjacentTileId, mapData.tilesets)
+                    
+                    if (isAdjacentPassable) {
+                      // Move to adjacent tile
+                      const moveParams: ActionParameters = {
+                        move: { x: adjacentTile.x, y: adjacentTile.y }
+                      }
+                      await executeAction(activePlayer.name, 'move', moveParams)
+                    }
+                    
+                    // Attack enemy
+                    const attackParams: ActionParameters = {
+                      attack: { x: enemy.x, y: enemy.y }
+                    }
+                    await executeAction(activePlayer.name, 'attack', attackParams)
+                  } else {
+                    // No adjacent tile available, just attack from current position
+                    const attackParams: ActionParameters = {
+                      attack: { x: enemy.x, y: enemy.y }
+                    }
+                    await executeAction(activePlayer.name, 'attack', attackParams)
+                  }
+                } else {
+                  // No enemy - move to tile (already checked passability above)
+                  const moveParams: ActionParameters = {
+                    move: { x, y }
+                  }
+                  await executeAction(activePlayer.name, 'move', moveParams)
+                }
+                
+                if (onActionComplete) {
+                  onActionComplete()
                 }
               })
 
@@ -468,15 +606,19 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
         engine.start(loader).then(() => {
           engineRef.current = engine
           
+          if (!engine) return
+          
+          const currentEngine = engine // Store reference for closure
+          
           // Enable click and drag panning after engine starts
-          engine.input.pointers.primary.on('down', (evt: ex.PointerEvent) => {
+          currentEngine.input.pointers.primary.on('down', (evt: ex.PointerEvent) => {
             isPanning = false
             hasMoved = false
             panStartScreenPos = evt.screenPos.clone()
-            panStartCameraPos = engine.currentScene.camera.pos.clone()
+            panStartCameraPos = currentEngine.currentScene.camera.pos.clone()
           })
 
-          engine.input.pointers.primary.on('move', (evt: ex.PointerEvent) => {
+          currentEngine.input.pointers.primary.on('move', (evt: ex.PointerEvent) => {
             if (panStartScreenPos && panStartCameraPos) {
               const delta = evt.screenPos.sub(panStartScreenPos)
               const distance = Math.abs(delta.x) + Math.abs(delta.y)
@@ -493,7 +635,7 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
               
               // Pan the camera
               if (isPanning) {
-                engine.currentScene.camera.pos = panStartCameraPos.sub(delta)
+                currentEngine.currentScene.camera.pos = panStartCameraPos.sub(delta)
               }
             }
           })
@@ -511,6 +653,49 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
             hasMoved = false
           })
           
+          // Add mouse wheel zoom functionality
+          wheelHandler = (evt: WheelEvent) => {
+            evt.preventDefault()
+            
+            const zoomSpeed = 0.0003 // Reduced from 0.001 for smoother zoom
+            const minZoom = 0.5
+            const maxZoom = 3.0
+            
+            // Get current zoom
+            const currentZoom = currentEngine.currentScene.camera.zoom
+            
+            // Calculate new zoom (negative deltaY means zoom in)
+            const zoomDelta = -evt.deltaY * zoomSpeed
+            let newZoom = currentZoom + zoomDelta
+            
+            // Clamp zoom to min/max values
+            newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom))
+            
+            // Apply zoom
+            currentEngine.currentScene.camera.zoom = newZoom
+          }
+          
+          // Add wheel event listener to canvas
+          if (canvas) {
+            canvas.addEventListener('wheel', wheelHandler, { passive: false })
+          }
+          
+          // Handle window resize to make canvas responsive
+          const handleResize = () => {
+            if (currentEngine && currentEngine.canvas) {
+              const newWidth = window.innerWidth
+              const newHeight = window.innerHeight
+              currentEngine.canvas.width = newWidth
+              currentEngine.canvas.height = newHeight
+              currentEngine.screen.resolution = { width: newWidth, height: newHeight }
+            }
+          }
+          
+          window.addEventListener('resize', handleResize)
+          
+          // Store resize handler for cleanup
+          ;(currentEngine as any)._resizeHandler = handleResize
+          
           setLoading(false)
         })
       } catch (err) {
@@ -526,7 +711,14 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
     // Cleanup
     return () => {
       if (engineRef.current) {
+        const resizeHandler = (engineRef.current as any)._resizeHandler
+        if (resizeHandler) {
+          window.removeEventListener('resize', resizeHandler)
+        }
         engineRef.current.stop()
+      }
+      if (canvas && wheelHandler) {
+        canvas.removeEventListener('wheel', wheelHandler)
       }
     }
   }, [players, enemies])
@@ -542,6 +734,48 @@ function IsometricMap({ players = [], enemies = [] }: IsometricMapProps) {
   return (
     <div className="isometric-map-container">
       <canvas ref={canvasRef} className="isometric-canvas" />
+      <div className={`spell-slots-wrapper ${spellSlotsMinimized ? 'minimized' : ''}`}>
+        <div className="spell-slots-header">
+          <span className="spell-slots-title">Spell Slots</span>
+          <button 
+            className="toggle-spell-slots"
+            onClick={() => setSpellSlotsMinimized(!spellSlotsMinimized)}
+            title={spellSlotsMinimized ? 'Maximize' : 'Minimize'}
+          >
+            {spellSlotsMinimized ? '▲' : '▼'}
+          </button>
+        </div>
+        {!spellSlotsMinimized && (
+          <div className="spell-slots-container">
+            {Array.from({ length: 22 }).map((_, index) => {
+              const spell = mockSpells[index]
+              const isEmpty = !spell
+              const isOnCooldown = spell && spell.cooldown > 0
+              
+              return (
+                <div
+                  key={index}
+                  className={`spell-slot ${isEmpty ? 'empty' : ''} ${isOnCooldown ? 'on-cooldown' : ''}`}
+                  title={spell ? `${spell.name} (Level ${spell.level})` : 'Empty Slot'}
+                >
+                  {!isEmpty && (
+                    <>
+                      <div className="spell-level">Level {spell.level}</div>
+                      <div className="spell-icon">{spell.icon}</div>
+                      <div className="spell-name">{spell.name}</div>
+                      {isOnCooldown && (
+                        <div className="cooldown-overlay">
+                          <span className="cooldown-text">{spell.cooldown}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

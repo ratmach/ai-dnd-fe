@@ -9,6 +9,8 @@ interface InventoryModalProps {
   maxWeight: number
   onDropItem: (index: number) => void
   onUpdateItems: (items: (Item | null)[]) => void
+  activePlayerName?: string
+  onConsumeItem?: (itemId: string) => Promise<void>
 }
 
 function InventoryModal({
@@ -17,7 +19,9 @@ function InventoryModal({
   gold,
   maxWeight,
   onDropItem,
-  onUpdateItems
+  onUpdateItems,
+  activePlayerName = 'Player',
+  onConsumeItem
 }: InventoryModalProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
@@ -191,12 +195,27 @@ function InventoryModal({
 
           {selectedIndex !== null && items[selectedIndex] && (
             <div className="inventory-actions">
-              <button
-                className="drop-button"
-                onClick={() => handleDropItem(selectedIndex)}
-              >
-                Drop Item
-              </button>
+              <div className="action-buttons-row">
+                {items[selectedIndex]?.type === 'consumable' && onConsumeItem && (
+                  <button
+                    className="use-button"
+                    onClick={async () => {
+                      if (items[selectedIndex]) {
+                        await onConsumeItem(items[selectedIndex].id)
+                        setSelectedIndex(null)
+                      }
+                    }}
+                  >
+                    Use Consumable
+                  </button>
+                )}
+                <button
+                  className="drop-button"
+                  onClick={() => handleDropItem(selectedIndex)}
+                >
+                  Drop Item
+                </button>
+              </div>
               <div className="selected-item-info">
                 Selected: {items[selectedIndex]?.name}
               </div>
