@@ -3,8 +3,12 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "",
+    "activeFile": "public/maps/tavern1.tmx",
     "expandedProjectPaths": [
+        ".",
+        "public",
+        "public/maps/tilesets",
+        "public/maps"
     ],
     "fileStates": {
         "public/maps/tavern tileset.tsx": {
@@ -12,11 +16,19 @@
             "scaleInEditor": 1
         },
         "public/maps/tavern.tmx": {
-            "scale": 1,
+            "scale": 0.75,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 555.5,
-                "y": 237
+                "x": 1563.3333333333333,
+                "y": 219.99999999999994
+            }
+        },
+        "public/maps/tavern1.tmx": {
+            "scale": 2,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 1274.25,
+                "y": 587
             }
         },
         "public/maps/test.tsx": {
@@ -40,6 +52,11 @@
             "scaleInDock": 1,
             "scaleInEditor": 1
         },
+        "public/maps/tilesets/tavern_tileset.tsx": {
+            "dynamicWrapping": false,
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
         "public/maps/world.tmx": {
             "scale": 2,
             "selectedLayer": 0,
@@ -59,12 +76,16 @@
     "map.tileWidth": 128,
     "map.width": 20,
     "openFiles": [
+        "public/maps/tavern1.tmx",
+        "public/maps/tilesets/tavern_tileset.tsx"
     ],
     "project": "maps.tiled-project",
     "recentFiles": [
-        "public/maps/tilesets/tavern_assets.tsx",
+        "public/maps/tilesets/tavern_tileset.tsx",
+        "public/maps/tavern1.tmx",
         "public/maps/tilesets/tavern.tsx",
         "public/maps/tavern.tmx",
+        "public/maps/tilesets/tavern_assets.tsx",
         "public/maps/test3.tsx",
         "public/maps/world.tmx",
         "public/maps/test1.tsx",

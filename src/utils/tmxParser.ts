@@ -1,8 +1,10 @@
 /**
- * Simple TMX (Tiled Map Editor) parser for isometric maps
+ * TMX (Tiled Map Editor) utilities for isometric maps
+ * Now using @excaliburjs/plugin-tiled for parsing
  */
 
 import { ImageSource } from "excalibur"
+import { TiledMapResource } from "@excaliburjs/plugin-tiled"
 
 export interface TileProperties {
   [key: string]: {value: string, image: string | null}
@@ -23,6 +25,7 @@ export interface Tileset {
   tileHeight: number
   columns: number
   tiles: Tile[]
+  images?: { [tileId: number]: ImageSource } // Map of tile ID to ImageSource
 }
 
 export interface Layer {
@@ -58,7 +61,208 @@ export const tileImages: { [key: string]: ImageSource } = {
   //forest: new ImageSource('/tiles/tile_031.png')
 }
 
-export function parseTMX(xmlText: string): MapData {
+/**
+ * Load TMX file using excalibur-tiled plugin
+ * Returns a TiledMapResource that can be used to access map data
+ */
+export function createTMXResource(path: string): TiledMapResource {
+  console.log('Creating TMX resource for:', path)
+  
+  const tiledMap = new TiledMapResource(path)
+  
+  // Set up custom path converter BEFORE loading
+  tiledMap.convertPath = (originPath: string, relativePath: string) => {
+    console.log('Converting path:', { originPath, relativePath })
+    
+    // If path is absolute, return as-is
+    if (relativePath.startsWith('/') || relativePath.startsWith('http')) {
+      return relativePath
+    }
+    
+    // Resolve relative to origin directory
+    let originDir = originPath.substring(0, originPath.lastIndexOf('/'))
+    if(!originDir.startsWith("maps") && !originDir.startsWith("/maps")){
+      originDir = "maps/" + originDir
+    }
+    const resolved = `${originDir}/${relativePath}`
+    console.log('  → Resolved to:', resolved)
+    return resolved
+  }
+  
+  return tiledMap
+}
+
+/**
+ * @deprecated Use createTMXResource and let Excalibur's loader handle loading
+ */
+export async function loadTMXResource(path: string): Promise<TiledMapResource> {
+  const tiledMap = createTMXResource(path)
+  try {
+    await tiledMap.load()
+    console.log('✓ TMX loaded successfully')
+    console.log('  Tilesets:', tiledMap.data?.tileSets?.length)
+    console.log('  Layers:', tiledMap.data?.layers?.length)
+    return tiledMap
+  } catch (error) {
+    console.error('✗ Failed to load TMX:', error)
+    throw error
+  }
+}
+
+/**
+ * Convert TiledMapResource data to our MapData format
+ * This maintains compatibility with existing code
+ */
+export function tiledResourceToMapData(tiledMap: TiledMapResource): MapData {
+  const map = tiledMap.data
+  
+  if (!map) {
+    throw new Error('TiledResource has no data')
+  }
+
+  const mapData: MapData = {
+    width: map.width,
+    height: map.height,
+    tileWidth: map.tileWidth,
+    tileHeight: map.tileHeight,
+    orientation: map.orientation || null,
+    layers: [],
+    tilesets: []
+  }
+
+  // Parse tilesets
+  if (map.tileSets) {
+    map.tileSets.forEach((tileset: any) => {
+      const tiles: Tile[] = []
+      
+      if (tileset.tiles) {
+        tileset.tiles.forEach((tile: any) => {
+          const properties: TileProperties = {}
+          
+          if (tile.properties) {
+            tile.properties.forEach((prop: any) => {
+              properties[prop.name] = {
+                value: prop.value?.toString() || '',
+                image: null
+              }
+            })
+          }
+          
+          tiles[tile.id] = { id: tile.id, properties }
+        })
+      }
+
+      mapData.tilesets.push({
+        firstGid: tileset.firstgid,
+        tileWidth: tileset.tilewidth,
+        tileHeight: tileset.tileheight,
+        columns: tileset.columns || 1,
+        tiles
+      })
+    })
+  }
+
+  // Parse layers
+  console.log('Parsing layers from TiledMap...')
+  if (map.layers) {
+    map.layers.forEach((layer: any, idx: number) => {
+      console.log(`Layer ${idx}:`, {
+        id: layer.id,
+        name: layer.name,
+        type: layer.type,
+        visible: layer.visible,
+        width: layer.width,
+        height: layer.height
+      })
+      
+      if (layer.type !== 'tilelayer') {
+        console.log(`  → Skipping non-tile layer`)
+        return
+      }
+      
+      const layerData: Layer = {
+        id: layer.id,
+        name: layer.name,
+        width: layer.width,
+        height: layer.height,
+        tiles: []
+      }
+
+      // Convert flat data array to 2D array
+      if (layer.data) {
+        let nonZeroCount = 0
+        for (let y = 0; y < layerData.height; y++) {
+          layerData.tiles[y] = []
+          for (let x = 0; x < layerData.width; x++) {
+            const index = y * layerData.width + x
+            const tileId = layer.data[index] || 0
+            layerData.tiles[y][x] = tileId
+            if (tileId !== 0) nonZeroCount++
+          }
+        }
+        console.log(`  → Parsed ${nonZeroCount} non-empty tiles`)
+      }
+
+      mapData.layers.push(layerData)
+    })
+  }
+  
+  console.log(`Total layers parsed: ${mapData.layers.length}`)
+
+  return mapData
+}
+
+/**
+ * @deprecated Use loadTMXResource and tiledResourceToMapData instead
+ */
+/**
+ * Parse external TSX tileset file
+ */
+async function parseTSX(tsxPath: string): Promise<{ tiles: Tile[], images: { [tileId: number]: ImageSource } }> {
+  const response = await fetch(tsxPath)
+  if (!response.ok) {
+    throw new Error(`Failed to load tileset file: ${tsxPath}`)
+  }
+  const xmlText = await response.text()
+  const parser = new DOMParser()
+  const xmlDoc = parser.parseFromString(xmlText, 'text/xml')
+
+  const tiles: Tile[] = []
+  const images: { [tileId: number]: ImageSource } = {}
+
+  const tileElements = xmlDoc.querySelectorAll('tile')
+  tileElements.forEach((tile) => {
+    const id = parseInt(tile.getAttribute('id') || '0')
+    const properties: TileProperties = {}
+    
+    // Parse properties
+    const propertyElements = tile.querySelectorAll('property')
+    propertyElements.forEach((prop) => {
+      const name = prop.getAttribute('name')
+      const value = prop.getAttribute('value')
+      if (name && value) {
+        properties[name] = { value: value, image: null }
+      }
+    })
+    
+    // Parse image
+    const imageElement = tile.querySelector('image')
+    if (imageElement) {
+      const imagePath = imageElement.getAttribute('source')
+      if (imagePath) {
+        // Resolve relative path (../ means go up from tilesets/ to maps/)
+        const resolvedPath = imagePath.replace('../', '/maps/')
+        images[id] = new ImageSource(resolvedPath)
+      }
+    }
+    
+    tiles[id] = { id, properties }
+  })
+
+  return { tiles, images }
+}
+
+export async function parseTMX(xmlText: string): Promise<MapData> {
   const parser = new DOMParser()
   const xmlDoc = parser.parseFromString(xmlText, 'text/xml')
 
@@ -79,37 +283,52 @@ export function parseTMX(xmlText: string): MapData {
 
   // Parse tilesets
   const tilesets = xmlDoc.querySelectorAll('tileset')
-  tilesets.forEach((tileset) => {
+  for (const tileset of tilesets) {
     const firstGid = parseInt(tileset.getAttribute('firstgid') || '0')
-    const tileWidth = parseInt(tileset.getAttribute('tilewidth') || '0')
-    const tileHeight = parseInt(tileset.getAttribute('tileheight') || '0')
-    const columns = parseInt(tileset.getAttribute('columns') || '1')
+    const source = tileset.getAttribute('source')
 
-    const tiles: Tile[] = []
-    const tileElements = tileset.querySelectorAll('tile')
-    tileElements.forEach((tile) => {
-      const id = parseInt(tile.getAttribute('id') || '0')
-      const properties: TileProperties = {}
-      const propertyElements = tile.querySelectorAll('property')
-      propertyElements.forEach((prop) => {
-        const name = prop.getAttribute('name')
-        const value = prop.getAttribute('value')
-        const image = prop.getAttribute('image')
-        if (name && value) {
-          properties[name] = {value: value, image: image || null}
-        }
+    let tiles: Tile[] = []
+    let images: { [tileId: number]: ImageSource } = {}
+    let tileWidth = parseInt(tileset.getAttribute('tilewidth') || '0')
+    let tileHeight = parseInt(tileset.getAttribute('tileheight') || '0')
+    let columns = parseInt(tileset.getAttribute('columns') || '1')
+
+    if (source) {
+      // External tileset - fetch and parse it
+      const tsxPath = `/maps/${source}`
+      console.log('Loading external tileset:', tsxPath)
+      const tsxData = await parseTSX(tsxPath)
+      tiles = tsxData.tiles
+      images = tsxData.images
+      console.log(`Loaded ${Object.keys(images).length} images from tileset`)
+    } else {
+      // Inline tileset
+      const tileElements = tileset.querySelectorAll('tile')
+      tileElements.forEach((tile) => {
+        const id = parseInt(tile.getAttribute('id') || '0')
+        const properties: TileProperties = {}
+        const propertyElements = tile.querySelectorAll('property')
+        propertyElements.forEach((prop) => {
+          const name = prop.getAttribute('name')
+          const value = prop.getAttribute('value')
+          const image = prop.getAttribute('image')
+          if (name && value) {
+            properties[name] = {value: value, image: image || null}
+          }
+        })
+        tiles[id] = { id, properties }
       })
-      tiles[id] = { id, properties }
-    })
+    }
 
     mapData.tilesets.push({
       firstGid,
       tileWidth,
       tileHeight,
       columns,
-      tiles
+      tiles,
+      images
     })
-  })
+  }
 
   // Parse layers
   const layers = xmlDoc.querySelectorAll('layer')
@@ -247,6 +466,14 @@ export function getTileImage(tileId: number, tilesets: Tileset[]): ImageSource |
     }
   }
 
+  if (!tileset) return null
+
+  // First try to get image from tileset's images map (from external .tsx file)
+  if (tileset.images && tileset.images[localTileId]) {
+    return tileset.images[localTileId]
+  }
+
+  // Fallback to old method using terrain property
   const tile = tileset?.tiles[localTileId]
   const terrain = tile?.properties?.terrain
 
