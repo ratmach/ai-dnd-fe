@@ -5,10 +5,10 @@
     },
     "activeFile": "public/maps/tavern1.tmx",
     "expandedProjectPaths": [
-        ".",
-        "public",
         "public/maps/tilesets",
-        "public/maps"
+        "public",
+        "public/maps",
+        "."
     ],
     "fileStates": {
         "public/maps/tavern tileset.tsx": {
@@ -24,11 +24,11 @@
             }
         },
         "public/maps/tavern1.tmx": {
-            "scale": 2,
-            "selectedLayer": 1,
+            "scale": 1,
+            "selectedLayer": 2,
             "viewCenter": {
-                "x": 1274.25,
-                "y": 587
+                "x": 1317.5,
+                "y": 443
             }
         },
         "public/maps/test.tsx": {
@@ -94,10 +94,10 @@
     ],
     "tileset.lastUsedFormat": "tsx",
     "tileset.tileSize": {
-        "height": 32,
-        "width": 64
+        "height": 64,
+        "width": 128
     },
     "tileset.transparentColor": "#fdfefe",
-    "tileset.type": 1,
-    "tileset.useTransparentColor": true
+    "tileset.type": 0,
+    "tileset.useTransparentColor": false
 }

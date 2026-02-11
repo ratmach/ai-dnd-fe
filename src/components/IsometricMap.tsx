@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as ex from 'excalibur'
-import { TiledMapResource } from '@excaliburjs/plugin-tiled'
-import { tileImages } from '../utils/tmxParser'
+import { TiledResource } from '@excaliburjs/plugin-tiled'
 import './IsometricMap.css'
 
 interface IsometricMapProps {
@@ -43,76 +42,33 @@ function IsometricMap({ }: IsometricMapProps) {
         })
 
         // Load Tiled map using plugin
-        const tiledMap = new TiledMapResource('/maps/tavern1.tmx', {
-          startingLayerZIndex: 0
+        const tiledMap = new TiledResource('/maps/tavern1.tmx', {
+          startZIndex: 0,
+          pathMap: [
+            // Convert ../assets/* paths to /maps/assets/*
+            { path: /\.\.\/assets\/(.*)/, output: '/maps/assets/[match]' }
+          ]
         })
-        
-        // Set up path converter to resolve relative tileset paths
-        // This must be set BEFORE adding to loader
-        tiledMap.convertPath = (originPath: string, relativePath: string) => {
-          
-          // If path is absolute, return as-is
-          if (relativePath.startsWith('/') || relativePath.startsWith('http')) {
-            return relativePath
-          }
-          
-          // Resolve relative to origin directory
-          // originPath will be like "/maps/tilesets/tavern_tileset.tsx"
-          // relativePath will be like "../assets/tavern floor.png"
-          const originDir = originPath.substring(0, originPath.lastIndexOf('/'))
-          // originDir = "/maps/tilesets"
-          
-          // Split relative path and resolve ../ 
-          const parts = relativePath.split('/')
-          const dirParts = originDir.split('/').filter(p => p)
-          
-          for (const part of parts) {
-            if (part === '..') {
-              dirParts.pop() // Go up one directory
-            } else if (part !== '.') {
-              dirParts.push(part)
-            }
-          }
-          
-          let resolved = '/' + dirParts.join('/')
-          if (resolved.startsWith("/assets")) {
-            resolved = "/maps" + resolved
-          }
-          return resolved
-        }
         
         // Add resources to loader
         const loader = new ex.Loader()
         loader.addResource(tiledMap)
-        loader.addResources(Object.values(tileImages))
+        //loader.addResources(Object.values(tileImages))
         
         // Start engine and load resources
         await engine.start(loader)
         
         // Add the Tiled map to the scene
-        tiledMap.addTiledMapToScene(engine.currentScene)
+        tiledMap.addToScene(engine.currentScene)
         
         // Light sources (in tile coordinates)
         const lightSources = [
           { x: 2, y: 5, radius: 2 },
+          { x: 8, y: 8, radius: 5, hardRadius: 3 },
         ]
         
         // Get the isometric map layers
-        const isoLayers = tiledMap.getIsometricMapLayers()
-        
-        console.log('Isometric layers:', isoLayers.length)
-        if (isoLayers.length > 0) {
-          console.log('Layer dimensions:', isoLayers[0].columns, 'x', isoLayers[0].rows)
-        }
-        
-        // Convert tile coords to isometric world coords
-        const tileWidth = 128
-        const tileHeight = 64
-        const convertToIso = (tileX: number, tileY: number) => {
-          const worldX = (tileX - tileY) * (tileWidth / 2)
-          const worldY = (tileX + tileY) * (tileHeight / 2)
-          return ex.vec(worldX, worldY)
-        }
+        const isoLayers = tiledMap.getIsoTileLayers()
         
         // Function to calculate light intensity at a tile position
         const getLightIntensity = (tileX: number, tileY: number): number => {
@@ -125,7 +81,12 @@ function IsometricMap({ }: IsometricMapProps) {
             
             if (distance <= light.radius) {
               // Full brightness at center, falloff to edge
-              const intensity = 1.0 - (distance / light.radius)
+              let intensity = 1.0 - (distance / light.radius)
+              if (light.hardRadius && distance < light.hardRadius) {
+                intensity = 1.0
+              }else{
+                intensity = 1.0 - (distance / light.radius)
+              }
               maxIntensity = Math.max(maxIntensity, intensity)
             }
           }
@@ -137,10 +98,15 @@ function IsometricMap({ }: IsometricMapProps) {
         let lightTilesCount = 0
         let topLayer = isoLayers[isoLayers.length - 1]
         console.log(topLayer)
-        for (let y = 0; y < topLayer.rows; y++) {
-          for (let x = 0; x < topLayer.columns; x++) {
-            const tile = topLayer.getTile(x, y)
-            if (tile) {
+        
+        // Get tile dimensions from the isometric map
+        const tileWidth = topLayer.isometricMap.tileWidth
+        const tileHeight = topLayer.isometricMap.tileHeight
+        
+        for (let y = 0; y < topLayer.height; y++) {
+          for (let x = 0; x < topLayer.width; x++) {
+            const tileInfo = topLayer.getTileByCoordinate(x, y)
+            if (tileInfo) {
               const intensity = getLightIntensity(x, y)
               const darkness = 1.0 - intensity // Inverse: 1 = dark, 0 = bright
               
@@ -165,7 +131,7 @@ function IsometricMap({ }: IsometricMapProps) {
               })
               
               
-              tile.addGraphic(lightPolygon)
+              tileInfo.exTile.addGraphic(lightPolygon)
             }else{
               console.log(`No tile at (${x}, ${y})`)
             }
