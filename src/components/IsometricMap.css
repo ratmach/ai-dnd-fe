@@ -206,3 +206,36 @@
   color: #ef4444;
   text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
 }
+
+/* Mute Button */
+.mute-button {
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  background: rgba(15, 15, 26, 0.95);
+  border: 2px solid rgba(100, 149, 237, 0.4);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1002;
+  font-size: 1.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.mute-button:hover {
+  background: rgba(20, 20, 36, 0.98);
+  border-color: rgba(100, 149, 237, 0.7);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+
+.mute-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+

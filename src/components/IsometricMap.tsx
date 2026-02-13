@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as ex from 'excalibur'
 import { TiledResource } from '@excaliburjs/plugin-tiled'
 import { CharacterManager } from '../utils/characterManager'
+import { AudioManager } from '../utils/audioManager'
 import './IsometricMap.css'
 
 interface IsometricMapProps {
@@ -22,8 +23,10 @@ function IsometricMap({ }: IsometricMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<ex.Engine | null>(null)
   const characterManagerRef = useRef<CharacterManager | null>(null)
+  const audioManagerRef = useRef<AudioManager | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [spellSlotsMinimized, setSpellSlotsMinimized] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -56,13 +59,21 @@ function IsometricMap({ }: IsometricMapProps) {
         const characterManager = new CharacterManager()
         characterManagerRef.current = characterManager
         
+        // Initialize audio manager
+        const audioManager = new AudioManager()
+        audioManagerRef.current = audioManager
+        
         // Add resources to loader
         const loader = new ex.Loader()
         loader.addResource(tiledMap)
         await characterManager.loadResources(loader)
+        await audioManager.loadResources(loader)
         
         // Start engine and load resources
         await engine.start(loader)
+        
+        // Start background music
+        audioManager.playBackgroundMusic('tavern')
         
         // Add the Tiled map to the scene
         tiledMap.addToScene(engine.currentScene)
@@ -286,6 +297,9 @@ function IsometricMap({ }: IsometricMapProps) {
 
     // Cleanup
     return () => {
+      if (audioManagerRef.current) {
+        audioManagerRef.current.cleanup()
+      }
       if (engineRef.current) {
         const resizeHandler = (engineRef.current as any)._resizeHandler
         if (resizeHandler) {
@@ -299,6 +313,13 @@ function IsometricMap({ }: IsometricMapProps) {
     }
   }, [])
 
+  const handleMuteToggle = () => {
+    if (audioManagerRef.current) {
+      const newMutedState = audioManagerRef.current.toggleMute()
+      setIsMuted(newMutedState)
+    }
+  }
+
   if (error) {
     return (
       <div className="isometric-map-container">
@@ -310,6 +331,16 @@ function IsometricMap({ }: IsometricMapProps) {
   return (
     <div className="isometric-map-container">
       <canvas ref={canvasRef} className="isometric-canvas" />
+      
+      {/* Mute Button */}
+      <button 
+        className="mute-button"
+        onClick={handleMuteToggle}
+        title={isMuted ? 'Unmute' : 'Mute'}
+      >
+        {isMuted ? '🔇' : '🔊'}
+      </button>
+      
       <div className={`spell-slots-wrapper ${spellSlotsMinimized ? 'minimized' : ''}`}>
         <div className="spell-slots-header">
           <span className="spell-slots-title">Spell Slots</span>
