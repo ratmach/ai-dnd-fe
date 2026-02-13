@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as ex from 'excalibur'
 import { TiledResource } from '@excaliburjs/plugin-tiled'
+import { CharacterManager } from '../utils/characterManager'
 import './IsometricMap.css'
 
 interface IsometricMapProps {
@@ -20,6 +21,7 @@ const mockSpells = [
 function IsometricMap({ }: IsometricMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<ex.Engine | null>(null)
+  const characterManagerRef = useRef<CharacterManager | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [spellSlotsMinimized, setSpellSlotsMinimized] = useState(false)
 
@@ -50,10 +52,14 @@ function IsometricMap({ }: IsometricMapProps) {
           ]
         })
         
+        // Initialize character manager
+        const characterManager = new CharacterManager()
+        characterManagerRef.current = characterManager
+        
         // Add resources to loader
         const loader = new ex.Loader()
         loader.addResource(tiledMap)
-        //loader.addResources(Object.values(tileImages))
+        await characterManager.loadResources(loader)
         
         // Start engine and load resources
         await engine.start(loader)
@@ -63,8 +69,10 @@ function IsometricMap({ }: IsometricMapProps) {
         
         // Light sources (in tile coordinates)
         const lightSources = [
-          { x: 2, y: 5, radius: 2 },
-          { x: 8, y: 8, radius: 5, hardRadius: 3 },
+          { x: 10, y: 14, radius: 2, hardRadius: 1 },
+          { x: 5, y: 10, radius: 2, hardRadius: 1 },
+          { x: 9, y: 6, radius: 4 },
+          //{ x: 8, y: 8, radius: 5, hardRadius: 3 },
         ]
         
         // Get the isometric map layers
@@ -139,6 +147,46 @@ function IsometricMap({ }: IsometricMapProps) {
         }
         
         console.log(`Total bright tiles (>0.5 intensity): ${lightTilesCount}`)
+        
+        // Isometric tile-to-world coordinate converter
+        const tileToWorld = (tileX: number, tileY: number): ex.Vector => {
+          // Get the isometric map to use its built-in conversion
+          if (topLayer && topLayer.isometricMap) {
+            const tile = topLayer.getTileByCoordinate(tileX, tileY)
+            if (tile) {
+              // Get the tile's world position and adjust for character placement
+              const tileWorldPos = tile.exTile.pos
+              // Center the character on the tile
+              return tileWorldPos
+            }
+          }
+          
+          // Fallback: manual isometric calculation
+          const tileWidth = tiledMap.map.tilewidth
+          const tileHeight = tiledMap.map.tileheight
+          const worldX = (tileX - tileY) * (tileWidth / 2)
+          const worldY = (tileX + tileY) * (tileHeight / 2)
+          return ex.vec(worldX, worldY)
+        }
+        
+        // Add mock characters with proper coordinate conversion
+        const mockCharacters = CharacterManager.generateMockCharacters()
+        for (const character of mockCharacters) {
+          characterManager.addCharacter(character)
+          characterManager.createActorForCharacter(
+            character, 
+            engine.currentScene, 
+            tileToWorld,
+            {
+              rows: tiledMap.map.height,
+              columns: tiledMap.map.width,
+              tileWidth: tiledMap.map.tilewidth,
+              tileHeight: tiledMap.map.tileheight
+            }
+          )
+        }
+        
+        console.log('Characters added:', mockCharacters.length)
         
         engineRef.current = engine
 

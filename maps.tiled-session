@@ -5,10 +5,10 @@
     },
     "activeFile": "public/maps/tavern1.tmx",
     "expandedProjectPaths": [
-        "public",
-        "public/maps/tilesets",
         ".",
-        "public/maps"
+        "public/maps",
+        "public",
+        "public/maps/tilesets"
     ],
     "fileStates": {
         "public/maps/tavern tileset.tsx": {
@@ -24,11 +24,11 @@
             }
         },
         "public/maps/tavern1.tmx": {
-            "scale": 2,
+            "scale": 1,
             "selectedLayer": 4,
             "viewCenter": {
-                "x": 1394.75,
-                "y": 738
+                "x": 1393.5,
+                "y": 650
             }
         },
         "public/maps/test.tsx": {
@@ -54,12 +54,12 @@
         },
         "public/maps/tilesets/tavern_tileset.tsx": {
             "dynamicWrapping": false,
-            "scaleInDock": 0.33,
+            "scaleInDock": 0.5,
             "scaleInEditor": 1
         },
         "public/maps/tilesets/test.tsx": {
             "scaleInDock": 0.33,
-            "scaleInEditor": 1
+            "scaleInEditor": 0.5
         },
         "public/maps/world.tmx": {
             "scale": 2,
