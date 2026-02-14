@@ -15,7 +15,7 @@ export class CharacterManager {
 
   constructor() {
     // Initialize character sprites
-    this.characterSprites.set('knight', new ex.ImageSource('/characters/processed/knight.png'))
+    this.characterSprites.set('knight', new ex.ImageSource('/characters/processed/corrupt knight.png'))
     this.characterSprites.set('ranger', new ex.ImageSource('/characters/processed/ranger.png'))
     this.characterSprites.set('druid', new ex.ImageSource('/characters/processed/druid.png'))
     this.characterSprites.set('dwarf', new ex.ImageSource('/characters/processed/dwarf.png'))
@@ -51,7 +51,8 @@ export class CharacterManager {
     character: Character, 
     scene: ex.Scene,
     tileToWorldConverter?: (tileX: number, tileY: number) => ex.Vector,
-    isometricConfig?: { rows: number; columns: number; tileWidth: number; tileHeight: number }
+    _isometricConfig?: { rows: number; columns: number; tileWidth: number; tileHeight: number }, // kept for API compatibility
+    layerZIndex?: number // Add layer z-index parameter
   ): ex.Actor {
     const spriteImage = this.characterSprites.get(character.sprite)
     
@@ -74,20 +75,26 @@ export class CharacterManager {
       anchor: ex.vec(0.5, 1), // Bottom-center anchor for isometric
     })
 
-    // Add IsometricEntityComponent if isometric config provided
-    if (isometricConfig) {
+    // For isometric maps, we MUST use IsometricEntityComponent for proper depth sorting
+    // The elevation determines the vertical "height" in the isometric world
+    if (_isometricConfig) {
       const isoComponent = new ex.IsometricEntityComponent({
-        rows: isometricConfig.rows,
-        columns: isometricConfig.columns,
-        tileWidth: isometricConfig.tileWidth,
-        tileHeight: isometricConfig.tileHeight
+        rows: _isometricConfig.rows,
+        columns: _isometricConfig.columns,
+        tileWidth: _isometricConfig.tileWidth,
+        tileHeight: _isometricConfig.tileHeight
       })
-      // Set elevation to be above the map (map layers start at 0)
-      isoComponent.elevation = 10
+      
+      // Set elevation based on layer z-index
+      // Ground tiles are elevation 0, next layer is elevation 2, so characters at layer 1 get elevation 1
+      isoComponent.elevation = (layerZIndex !== undefined ? layerZIndex : 1)
+      
       actor.addComponent(isoComponent)
+      console.log(`Character ${character.name}: using IsometricEntityComponent with elevation ${isoComponent.elevation}`)
     } else {
-      // Fallback z-index for non-isometric
-      actor.z = 100
+      // Fallback for non-isometric maps
+      actor.z = layerZIndex !== undefined ? layerZIndex * 100 : 100
+      console.log(`Character ${character.name}: using z-index ${actor.z} (non-isometric)`)
     }
 
     // Add sprite
@@ -130,7 +137,7 @@ export class CharacterManager {
         name: 'Knight',
         type: 'player',
         sprite: 'knight',
-        position: { x: 8, y: 8 } // Tile coordinates
+        position: { x: 9, y: 6 } // Tile coordinates
       },
       {
         id: 'player2',

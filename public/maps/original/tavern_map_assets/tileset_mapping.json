@@ -1,0 +1,12 @@
+{
+    "assets":[
+        {
+            "original": "flag.png",
+            "processed": "flag.png",
+            "resized_w": 128,
+            "resized_h": 64,
+            "x": 0,
+            "y": 0
+        }
+    ]
+}

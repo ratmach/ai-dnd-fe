@@ -89,7 +89,17 @@ function IsometricMap({ }: IsometricMapProps) {
         // Get the isometric map layers
         const isoLayers = tiledMap.getIsoTileLayers()
         
-        // Function to calculate light intensity at a tile position
+        // Debug: Check the isometric layers and their tile elevations
+        console.log('Isometric layers:', isoLayers.map((layer: any, idx: number) => {
+          // Get a sample tile to check elevation
+          const sampleTile = layer.getTileByCoordinate(5, 5)
+          return {
+            index: idx,
+            name: layer.name,
+            elevation: sampleTile?.exTile?.get(ex.IsometricEntityComponent)?.elevation,
+            order: layer.order
+          }
+        }))
         const getLightIntensity = (tileX: number, tileY: number): number => {
           let maxIntensity = 0 // Complete darkness by default
           
@@ -180,6 +190,44 @@ function IsometricMap({ }: IsometricMapProps) {
           return ex.vec(worldX, worldY)
         }
         
+        // Find the "characters" objectgroup to get its z-index
+        let charactersLayerZ = 100 // Default fallback z-index
+        
+        // Check all layers in the raw map data (both tile layers and object groups)
+        const allLayers = tiledMap.map?.layers || []
+        console.log('All layers in map:', allLayers.map((l: any) => ({ name: l.name, type: l.type || 'tilelayer', id: l.id })))
+        
+        const charactersLayer = allLayers.find((layer: any) => layer.name === 'characters')
+        
+        if (charactersLayer) {
+          // Calculate z-index based on layer order
+          // The startZIndex is 0, and each layer gets its own z-index starting from there
+          const layerIndex = allLayers.indexOf(charactersLayer)
+          charactersLayerZ = layerIndex // Use the layer index directly as the z-index
+          console.log(`Found "characters" objectgroup at index ${layerIndex}, type: ${charactersLayer.type}, using z-index: ${charactersLayerZ}`)
+        } else {
+          console.warn('No "characters" objectgroup found in map, using default z-index:', charactersLayerZ)
+        }
+        
+        // Debug: Check the isometric layers and their tile elevations
+        console.log('Isometric layers:', isoLayers.map((layer: any, idx: number) => {
+          // Get a sample tile to check elevation
+          const sampleTile = layer.getTileByCoordinate(5, 5)
+          return {
+            index: idx,
+            name: layer.name,
+            elevation: sampleTile?.exTile?.get(ex.IsometricEntityComponent)?.elevation,
+            order: layer.order
+          }
+        }))
+        
+        // Also check the TiledResource layers directly
+        console.log('TiledResource layers:', tiledMap.layers.map((l: any) => ({ 
+          name: l.name, 
+          type: l.constructor.name,
+          order: l.order
+        })))
+        
         // Add mock characters with proper coordinate conversion
         const mockCharacters = CharacterManager.generateMockCharacters()
         for (const character of mockCharacters) {
@@ -193,14 +241,15 @@ function IsometricMap({ }: IsometricMapProps) {
               columns: tiledMap.map.width,
               tileWidth: tiledMap.map.tilewidth,
               tileHeight: tiledMap.map.tileheight
-            }
+            },
+            charactersLayerZ // Pass the characters layer z-index
           )
         }
         
-        console.log('Characters added:', mockCharacters.length)
+        console.log('Characters added:', mockCharacters.length, 'at z-index:', charactersLayerZ)
         
-        engineRef.current = engine
-
+          engineRef.current = engine
+          
         // Camera panning state
         let isPanning = false
         let panStartScreenPos: ex.Vector | null = null
